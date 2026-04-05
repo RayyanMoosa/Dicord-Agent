@@ -1,0 +1,609 @@
+{
+  "name": "Advanced Lead Intelligence and Enrichment System",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Lead Intelligence Research Request",
+        "formDescription": "Submit lead information to get comprehensive intelligence and insights",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Company Domain",
+              "placeholder": "Company website domain (e.g., example.com)",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "LinkedIn Profile URL",
+              "placeholder": "LinkedIn profile URL (optional)"
+            },
+            {
+              "fieldLabel": "Additional Context",
+              "fieldType": "textarea",
+              "placeholder": "Any additional information about the lead (optional)"
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "buttonLabel": "Start Research"
+        }
+      },
+      "id": "15d47770-d2f8-433c-bedc-3ec5704ed96d",
+      "name": "Lead Submission Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [
+        176,
+        352
+      ],
+      "webhookId": "86341767-3837-4d48-86d4-4b74aa6a6b28"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Search for specific, dated evidence of manual processes at this marketing agency. Always return: the exact source type (LinkedIn/Glassdoor/Job Posting/Website), a verbatim or near-verbatim observation, and the approximate date found. Never return generic industry trends.",
+        "messages": {
+          "message": [
+            {
+              "content": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('message0_Text', ``, 'string') }}"
+            }
+          ]
+        },
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "05ed2d5e-7376-4fe2-9744-dd69fc24f361",
+      "name": "Perplexity for AI Interest Research",
+      "type": "n8n-nodes-base.perplexityTool",
+      "typeVersion": 1,
+      "position": [
+        704,
+        576
+      ],
+      "credentials": {
+        "perplexityApi": {
+          "id": "OFz5Ygu1J7mmYXfT",
+          "name": "Perplexity account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Perform a targeted company-level research query. Return specific, dated findings — job posting language, LinkedIn post excerpts, Glassdoor quotes, or website copy. Never return generic industry benchmarks or vague trends.",
+        "messages": {
+          "message": [
+            {
+              "content": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('message0_Text', `Research query on company name doing a general search. `, 'string') }}"
+            }
+          ]
+        },
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "4570e546-2f73-4e56-bd0c-15835f04bf6a",
+      "name": "Perplexity Research Tool",
+      "type": "n8n-nodes-base.perplexityTool",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        576
+      ],
+      "credentials": {
+        "perplexityApi": {
+          "id": "OFz5Ygu1J7mmYXfT",
+          "name": "Perplexity account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Research a specific person on LinkedIn by full name. Return: their current title, company, listed skills/tools, any public posts about workflows or processes, and approximate dates. Always cite the LinkedIn profile URL or post URL when available.",
+        "messages": {
+          "message": [
+            {
+              "content": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('message0_Text', `The first and last name of the lead.`, 'string') }}"
+            }
+          ]
+        },
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "0602a4c3-8f05-440d-ada1-21cb340e3fe0",
+      "name": "Perplexity for LinkedIn Research",
+      "type": "n8n-nodes-base.perplexityTool",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        576
+      ],
+      "credentials": {
+        "perplexityApi": {
+          "id": "OFz5Ygu1J7mmYXfT",
+          "name": "Perplexity account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"date\": \"2024-01-15\",\n  \"agencyName\": \"Example Agency\",\n  \"companyDomain\": \"exampleagency.com\",\n  \"teamSizeEstimate\": \"8-12 people\",\n  \"totalHoursLostPerMonth\": 47,\n  \"totalCostPerMonth\": \"$2,115\",\n  \"totalCostPerYear\": \"$25,380\",\n  \"automationGaps\": [\n    {\n      \"gapNumber\": 1,\n      \"gapName\": \"Manual Lead Triage & CRM Entry\",\n      \"whatIsHappening\": \"New leads from ads and forms are being manually reviewed, scored and entered into the CRM by a team member\",\n      \"hoursLostPerMonth\": 12,\n      \"hourlyRate\": 45,\n      \"costPerMonth\": \"$540\",\n      \"evidenceSource\": \"LinkedIn job posting (March 2026): 'Marketing Coordinator responsible for manually updating CRM records and lead statuses daily'\"\n    },\n    {\n      \"gapNumber\": 2,\n      \"gapName\": \"Manual Client Reporting\",\n      \"whatIsHappening\": \"Account managers are manually pulling data from Meta, Google Ads and GA4 each month to compile client reports\",\n      \"hoursLostPerMonth\": 16,\n      \"hourlyRate\": 45,\n      \"costPerMonth\": \"$720\",\n      \"evidenceSource\": \"Glassdoor review (February 2026): 'Every Friday is report day — we spend the whole morning pulling numbers from different platforms and building decks'\"\n    }\n  ],\n  \"auditReportFormatted\": \"Full formatted audit report HTML here\",\n  \"leadName\": \"John Smith\",\n  \"email\": \"john@exampleagency.com\",\n  \"decisionMaker\": true\n}"
+      },
+      "id": "97ea32d7-b8e3-4101-bca3-bd02f994cd91",
+      "name": "Intelligence Report Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1376,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# AI Interest Research Agent\n\n**UPDATED:** Manual process detection specialist for marketing agencies.\n\nResearches job postings, website, LinkedIn, tech stack, and Glassdoor reviews to identify automation gaps.",
+        "height": 624,
+        "width": 528,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        320,
+        96
+      ],
+      "id": "4fb0e5ba-20ef-4c26-897d-b081ae631b0a",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Lead Scoring Agent\n\nScores leads on revenue, maturity, AI readiness, company size, and industry fit (0-100).",
+        "height": 624,
+        "width": 336
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1968,
+        96
+      ],
+      "id": "ab1ddefa-6c42-48ea-9edb-b351cd2073a9",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "# Lead Intelligence Agent (Audit Report)\n\n**UPDATED:** AI automation audit specialist.\n\nGenerates personalised AUTOMATION GAP AUDIT REPORT for the prospect — diagnosis only, no solutions. Ends with CTA.",
+        "height": 624,
+        "width": 640,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        880,
+        96
+      ],
+      "id": "34590b6d-df90-4b1f-b4fb-06959e936a13",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\t\"score\": 50\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2160,
+        592
+      ],
+      "id": "10a4595f-18d5-4c00-808d-3da4c2234126",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "gpt-4o"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        464,
+        576
+      ],
+      "id": "9d67c3b7-9f20-440e-81f2-615ab4fa8394",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "B5XSKoYeKSAlOka2",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "gpt-4o"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        912,
+        576
+      ],
+      "id": "b70656a9-6120-41db-9ac0-dbf7f8a89924",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "B5XSKoYeKSAlOka2",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a manual process detection specialist focused exclusively on marketing agencies. Your job is to find SPECIFIC, DATED, SOURCE-ATTRIBUTED evidence of manual, repetitive, time-consuming work being done by this agency that AI automation could eliminate.\n\n⚠️ CRITICAL EVIDENCE RULES — APPLY TO EVERY FINDING:\n- Every piece of evidence MUST include: (1) Source type, (2) Specific observation (verbatim or near-verbatim where possible), (3) Approximate date\n- NEVER use generic phrases such as \"industry benchmarks\", \"common workflows\", \"general trends\", \"agencies typically\", \"most companies\", or any variation\n- If you cannot find real data for a specific signal, simulate a realistic, plausible company-specific signal using the agency's name, team size, and service type — label it as \"Inferred from [company name] profile + agency industry norms (April 2026)\"\n- Examples of ACCEPTABLE evidence:\n  • \"LinkedIn job posting (March 2026): 'Marketing Coordinator — responsibilities include manually updating CRM records and assigning leads'\"\n  • \"Glassdoor review (February 2026): 'Fridays are a nightmare — we spend the whole morning pulling numbers from Meta and Google to build reports'\"\n  • \"Company website (April 2026): Services page lists 12 active clients with no mention of a client portal or automated reporting tool\"\n  • \"LinkedIn team profile (March 2026): No team members list HubSpot, Make, or Zapier in their skills — only Google Sheets and Excel\"\n\nUse Perplexity to research the following about the agency:\n\n1. JOB POSTINGS — Search for current or recent job postings from this company. Look for roles that describe manual, repetitive tasks:\n- \"Account Manager\" roles that mention reporting, updating spreadsheets, chasing clients\n- \"Marketing Coordinator\" roles that mention data entry, scheduling, manual follow-up\n- \"Project Manager\" roles that mention manual task assignment, status updates\n- \"Sales Development Rep\" roles that mention manual outreach, CRM updates\n- Any role mentioning \"manually\", \"spreadsheets\", \"reporting\", \"coordinating\", \"tracking\"\n- QUOTE the relevant responsibility line from each posting and note the date\n\n2. WEBSITE & SERVICES — Visit their website and identify:\n- Exact services offered (use the language from their website)\n- Approximate number of clients based on case studies, testimonials, or team size\n- Whether they mention specific tools, software, or processes by name\n- Whether they have a client portal, reporting dashboard, or automation mention\n- Note the date of last website update if visible\n\n3. LINKEDIN — Research the company LinkedIn and founder/team profiles:\n- List every tool named in team members' skills sections — note which members have which tools\n- Note any public posts about operational challenges, workload, or process improvements — quote them\n- Confirm the exact team size and headcount breakdown\n- Identify whether any dedicated ops, delivery, or account management roles exist\n\n4. TECH STACK — Use Perplexity to research what tools this agency uses:\n- CRM: Is it HubSpot, Salesforce, Pipedrive, or a spreadsheet? Cite the source\n- Project management: Asana, Monday, ClickUp, Trello, or spreadsheet? Cite the source\n- Reporting: Manual deck-building, automated dashboards, or a client portal? Cite the source\n- Communication: Slack, email, WhatsApp? Cite the source\n- Client onboarding: Manual, Typeform, or automated? Cite the source\n- For each tool identified, note: source (LinkedIn skill, job posting, website mention) and date\n\n5. GLASSDOOR / REVIEWS — Search for employee reviews mentioning:\n- Complaints about manual processes or repetitive admin tasks — QUOTE the review and note the month/year\n- Mentions of being overwhelmed with reporting or coordination work\n- References to lack of systems or automation\n\nOUTPUT the following structured data:\n- Agency name and confirmed team headcount (with source)\n- Services they offer (quoted from website where possible)\n- Tools/tech stack identified (with source and confidence level for each)\n- Evidence of manual processes found (each with: Source Type | Specific Observation | Date)\n- Roles identified that suggest manual work (with quoted job responsibilities)\n- Overall Automation Gap Score (1-10): Based on evidence found, not industry assumptions\n- Key Pain Points Summary (3-5 bullet points, each citing a specific source)",
+        "options": {
+          "systemMessage": "=Company Domain: {{ $json['Company Domain'] }}\nLinkedIn URL: {{ $json['LinkedIn Profile URL'] }}\nAdditional Context: {{ $json['Additional Context'] }}\n\nIMPORTANT: This is a marketing agency. Focus ALL research on finding SPECIFIC, DATED, SOURCE-ATTRIBUTED evidence of manual processes and automation gaps. Do NOT use industry benchmarks or generic trends. Every finding must cite: Source Type + Specific Observation + Approximate Date. If real data is not available for a signal, simulate a realistic company-specific signal and label it as inferred.",
+          "maxIterations": 30
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        560,
+        352
+      ],
+      "id": "4f9972b9-56ac-4ecb-9f97-cc35ecddce2b",
+      "name": "AI Interest Research Agent"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are an AI automation audit specialist. Your job is to analyse a marketing agency and produce a concise, personalised AUTOMATION GAP AUDIT REPORT that will be sent directly to the agency founder or director as a lead magnet.\n\nThis report must:\n- Feel deeply personalised to THEIR specific agency — use their actual name, tools, team structure, and services throughout\n- Show exactly where THEIR team is spending hours on manual work, with specific evidence\n- Attach real dollar estimates to each gap\n- Create urgency through numbers and specificity, NOT through selling\n- Include ZERO solutions, blueprints, or recommendations on how to fix anything\n- End with ONE clear call-to-action\n- Be written in full, valid HTML — suitable for sending as an HTML email\n\n⚠️ LANGUAGE RULES — STRICTLY ENFORCED:\n- BANNED words: \"likely\", \"may\", \"might\", \"possibly\", \"probably\", \"could be\", \"seems to\", \"appears to\", \"we believe\", \"we think\", \"it's possible that\", \"you might be\"\n- REQUIRED tone: Authoritative, consultant-level, specific. Write as if you have reviewed their internal operations.\n- CORRECT: \"Your team is spending approximately 12 hours per month manually entering leads into the CRM.\"\n- INCORRECT: \"Your team likely spends around 12 hours per month on CRM tasks.\"\n- When approximating, use: \"approximately\", \"our analysis shows\", \"based on [specific source], your team is spending\", \"the data indicates\"\n\n⚠️ EVIDENCE RULES — STRICTLY ENFORCED:\n- Every automation gap MUST cite specific evidence in this format: [Source Type] + [Specific Observation] + [Date Reference]\n- ACCEPTABLE: \"LinkedIn job posting (March 2026): 'Marketing Coordinator — manually update CRM records and lead statuses daily'\"\n- ACCEPTABLE: \"Glassdoor review (February 2026): 'Every Friday is spent pulling reports from Meta and Google — takes the whole morning'\"\n- ACCEPTABLE: \"Company website (April 2026): No client portal or automated reporting tool is listed — 12 clients are managed manually\"\n- NOT ACCEPTABLE: \"Industry benchmarks suggest...\", \"Common for agencies your size...\", \"Many agencies report...\", \"General trends show...\"\n- If specific evidence was not found, use research findings to construct a realistic, specific signal — label it: \"Inferred from [Company Name]'s service profile and team structure (April 2026)\"\n\n⚠️ NO INTERNAL DATA IN CLIENT OUTPUT:\n- Do NOT include any lead score, qualification rating, or internal classification in the report\n- Do NOT include any labels like \"Hot Lead\", \"Warm Lead\", or score numbers\n- The report is a diagnostic tool for the prospect — it contains only their operational data\n\n---\n\nSTEP 1 — Use Perplexity Research Tool and Perplexity for LinkedIn Research to gather any missing data:\n- Confirm the agency's team size with a source\n- Find their approximate employee hourly rate for marketing agency roles (use $45/hr as default if not found)\n- Confirm any tools in their tech stack with source and date\n- Find any additional specific evidence of manual processes\n\n---\n\nSTEP 2 — Identify exactly 5 Automation Gaps specific to this agency. You must always produce 5 gaps — not 4, not 3. If strong evidence exists for fewer than 5, use the research findings to construct a realistic fifth gap and label its evidence as: \"Inferred from [Company Name]'s service profile and team structure (April 2026)\".\n\nFor EACH gap, you MUST provide:\na) Gap Name — short, specific (e.g. \"Manual Client Reporting\" or \"Manual Lead-to-CRM Entry\")\nb) What is happening — 2–3 sentences describing the manual process using authoritative, specific language. Reference the agency by name. Use \"is spending\", \"is processing\", \"is building\" — NOT \"likely spends\" or \"may be doing\".\nc) Estimated hours lost per month — calculated as: frequency x time per occurrence x team members affected. \nWrite the calculation as a plain sentence with NO apostrophes, NO single quotes, and NO special characters. \nExample format: \"2.5 hours per week x 4 weeks = 10 hours per month\". \nDo NOT write: \"2.5 hrs/week's\" or use any possessive or quoted punctuation inside the calculation string.\nd) Dollar value — hours × $45/hr (or confirmed rate). Format: \"12 hrs × $45/hr = $540/month\"\ne) Evidence — cite EXACTLY: [Source Type] | [Specific Observation] | [Date]\n\nCHOOSE gaps from this priority list (pick the 4–5 most relevant based on research evidence):\n1. Manual Lead Triage & CRM Entry\n2. Manual Sales Call Follow-Up\n3. Manual Client Onboarding\n4. Manual Client Reporting\n5. Manual Invoice & Payment Chasing\n6. Manual Ad Performance Monitoring\n7. Manual Content Scheduling & Posting\n8. Manual Internal Task Assignment\n\n---\n\nSTEP 3 — Calculate the TOTAL COST:\n- Sum all hours lost per month\n- Sum all dollar values per month\n- Calculate annual cost (monthly × 12)\n\n---\n\nSTEP 4 — Write the Audit Report HTML and return it as part of your JSON output.\n\nThe HTML report must include this exact CTA block BEFORE the closing signature — do not alter the wording:\n\n<div style=\"background:#0f172a;color:#ffffff;padding:32px;border-radius:10px;margin:40px 0;border-left:4px solid #4f46e5;\">\n  <p style=\"font-size:17px;font-weight:700;margin:0 0 10px 0;\">Your agency is leaving an estimated ${{ $('Lead Intelligence Agent').item.json.output.totalCostPerMonth }}/month on the table — that's ${{ $('Lead Intelligence Agent').item.json.output.totalCostPerYear }} this year alone.</p>\n  <p style=\"font-size:15px;margin:0 0 10px 0;color:#e2e8f0;\">We've already closed every one of these gaps for agencies just like yours.</p>\n  <p style=\"font-size:15px;margin:0 0 20px 0;color:#e2e8f0;\">You'll see exactly how we close each gap, what it costs to fix, and what your agency looks like 30 days after implementation. No pitch. Just the plan.</p>\n  <a href=\"https://cal.com/rayyanmoosa/ai-meeting\" style=\"display:inline-block;background:#4f46e5;color:#ffffff;padding:14px 32px;border-radius:7px;text-decoration:none;font-weight:700;font-size:15px;\">Book a free 15-minute breakdown →</a>\n</div>\n\nRETURN FORMAT RULES:\n- You MUST return a valid JSON object — nothing else\n- auditReportFormatted must contain the complete HTML email as a single string\n- Do NOT output raw HTML outside of JSON\n- Do NOT use markdown code fences anywhere\n- Do NOT add any explanation or text outside the JSON object\n- The HTML inside \"auditReportFormatted\" must be a single continuous string\n\nCRITICAL REMINDERS:\n- Return only a JSON object — nothing else\n- Every gap must have specific, dated evidence — no generic phrases\n- Use the agency's actual name throughout the report\n- No uncertainty language — write with authority\n- No solutions, automation suggestions, or fix recommendations\n- Dollar numbers must be specific and realistic — not inflated\n- Only include a gap if you have at least one cited source",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=AI Interest Research Findings:\n{{ $('AI Interest Research Agent').item.json.output }}\n\nCompany Domain: {{ $('Lead Submission Form').item.json['Company Domain'] }}\nLinkedIn URL: {{ $('Lead Submission Form').item.json['LinkedIn Profile URL'] }}\nAdditional Context: {{ $('Lead Submission Form').item.json['Additional Context'] }}\n\nTODAY'S DATE: {{ $now.format('MMMM D, YYYY') }}\n\nCRITICAL REMINDERS:\n1. Every automation gap MUST cite specific evidence: [Source Type] | [Specific Observation] | [Date]\n2. BANNED language: 'likely', 'may', 'might', 'possibly', 'probably', 'could be', 'seems to', 'appears to'\n3. Do NOT include any lead score, qualification rating, or Hot/Warm/Cold Lead labels in the output\n4. Include the CTA block exactly as specified before the signature\n5. Output ONLY a JSON object — no markdown, no raw HTML outside JSON",
+          "maxIterations": 30
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1040,
+        352
+      ],
+      "id": "e98c6289-88e3-4f1e-ab85-4362262f127d",
+      "name": "Lead Intelligence Agent"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a lead qualification specialist for an AI Agency. Score this lead based on their fit for our AI implementation services.\n\nScoring Criteria:\n1. Revenue Requirement (0-30 points): Must be generating at least $50k/month. Award full points for $50k+/month, scale down proportionally for lower revenue, 0 points if under $25k/month\n2. Business Maturity (0-25 points): Well-established business with proven track record, stable operations, professional team\n3. AI Interest & Readiness (0-25 points): Based on the AI Interest Research findings - current AI adoption, interest signals, readiness to implement\n4. Company Size & Structure (0-10 points): Team size, organizational complexity, decision-making capability\n5. Industry Fit (0-10 points): Industries where AI implementation has high ROI and clear use cases\n\nProvide:\n- Overall Lead Score (0-100)\n- Only output the single number, no notes or text.\n\nBe data-driven and specific in your scoring.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "={{ $json.output }}\n\n{{ $('Lead Submission Form').item.json['Company Domain'] }}\n\n{{ $('Lead Submission Form').item.json['Additional Context'] }}\n\n{{ $json.output.totalHoursLostPerMonth }}\n\n{{ $json.output.totalCostPerMonth }}\n\n{{ $json.output.automationGaps }}",
+          "maxIterations": 30
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        2016,
+        352
+      ],
+      "id": "10e4efba-76c0-41f1-9fca-e0aec5ac0681",
+      "name": "Lead Scoring Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "gpt-4o"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        2000,
+        592
+      ],
+      "id": "bb8fab36-6fdf-468f-9cb5-c0cf02285887",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "B5XSKoYeKSAlOka2",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.item.json.output;\n\nreturn [{\n  json: {\n    document: {\n      document_template_id: \"859D08B6-BAAF-4D9E-9C58-110B72446718\",\n      status: \"pending\",\n      payload: {\n        agencyName: output.agencyName,\n        date: output.date,\n        auditReportFormatted: output.auditReportFormatted,\n        totalHoursLostPerMonth: output.totalHoursLostPerMonth,\n        totalMonthlyCost: output.totalCostPerMonth,\n        totalAnnualCost: output.totalCostPerYear\n      }\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        352
+      ],
+      "id": "f5bc7b9f-0f35-4586-9c3d-b1984b6f48d1",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "documentTemplateId": "859D08B6-BAAF-4D9E-9C58-110B72446718",
+        "payload": "={{ JSON.stringify($json.document.payload) }}"
+      },
+      "type": "n8n-nodes-pdfmonkey.pdfMonkey",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        352
+      ],
+      "id": "1a0e7f7d-6d94-481d-b8e4-88431db93d67",
+      "name": "PDFMonkey",
+      "credentials": {
+        "pdfMonkeyApi": {
+          "id": "rkel8lwHC2vtcbPb",
+          "name": "PDFMonkey account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "moosarayyan145@gmail.com",
+        "subject": "=Your Agency Automation Audit — {{ $('Lead Intelligence Agent').item.json.output.totalHoursLostPerMonth }} hours found at {{ $('Lead Intelligence Agent').item.json.output.agencyName }}",
+        "message": "={{ $('Lead Intelligence Agent').item.json.output.auditReportFormatted }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "a4bbffa3-1cba-47d7-afbb-1ad08b1e9625",
+      "name": "Send Audit Report via Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2400,
+        352
+      ],
+      "webhookId": "0d6b6df1-ac1b-48a4-8e74-94e40b365cc5",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "PKhL0qznBAnMAv3H",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $('Lead Intelligence Agent').item.json.output;\nconst firstName = output.leadName.split(' ')[0];\nconst agencyName = output.agencyName;\nconst hours = output.totalHoursLostPerMonth;\nconst monthlyCost = output.totalCostPerMonth;\n\nconst dm = `Hi ${firstName}, ran a quick audit on ${agencyName} — found ${hours} hours your team is losing every month to manual processes. Comes out to around ${monthlyCost} a month.\\n\\nPut it into a report. Can I send it over?\\n\\nJust reply \"yes.\"`;\n\nreturn [{ json: { linkedInDM: dm, agencyName, firstName, hours, monthlyCost } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        640
+      ],
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Format LinkedIn DM"
+    },
+    {
+      "parameters": {
+        "sendTo": "moosarayyan145@gmail.com",
+        "subject": "=LinkedIn DM Ready — {{ $json.agencyName }} ({{ $json.hours }} hrs/month)",
+        "message": "={{ $json.linkedInDM }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1900,
+        640
+      ],
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Send LinkedIn DM via Gmail",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "PKhL0qznBAnMAv3H",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Lead Submission Form": {
+      "main": [
+        [
+          {
+            "node": "AI Interest Research Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perplexity Research Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Lead Intelligence Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perplexity for AI Interest Research": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Interest Research Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perplexity for LinkedIn Research": {
+      "ai_tool": [
+        [
+          {
+            "node": "Lead Intelligence Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intelligence Report Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Lead Intelligence Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Lead Scoring Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Interest Research Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Lead Intelligence Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Interest Research Agent": {
+      "main": [
+        [
+          {
+            "node": "Lead Intelligence Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Intelligence Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Format LinkedIn DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format LinkedIn DM": {
+      "main": [
+        [
+          {
+            "node": "Send LinkedIn DM via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Lead Scoring Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Scoring Agent": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "PDFMonkey",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDFMonkey": {
+      "main": [
+        [
+          {
+            "node": "Lead Scoring Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d100abcc-2ecc-4808-ae8c-601e801c13cb",
+  "meta": {
+    "instanceId": "68fc85537499af1aaaaf72f307ef606dc6aacc9fcd0c9d4a9644905c6810f831"
+  },
+  "id": "ihwezNMaqOpN7Awe",
+  "tags": []
+}
