@@ -41,17 +41,13 @@
             {
               "name": "Authorization",
               "value": "Bearer YOUR_FIREFLIES_API_KEY"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
             }
           ]
         },
         "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ query: 'query Transcript($transcriptId: String!) { transcript(id: $transcriptId) { id title sentences { speaker_name text } summary { keywords action_items outline overview } } }', variables: { transcriptId: $json.meetingId } }) }}",
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"query Transcript($transcriptId: String!) { transcript(id: $transcriptId) { id title sentences { speaker_name text } summary { keywords action_items outline overview } } }\",\n  \"variables\": {\n    \"transcriptId\": \"{{ $json.meetingId }}\"\n  }\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
