@@ -51,7 +51,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ query: 'query Transcript($transcriptId: String!) { transcript(id: $transcriptId) { id title sentences { speaker_name raw_words } summary { keywords action_items outline overview } } }', variables: { transcriptId: $json.meetingId } }) }}",
+        "body": "={{ JSON.stringify({ query: 'query Transcript($transcriptId: String!) { transcript(id: $transcriptId) { id title sentences { speaker_name text } summary { keywords action_items outline overview } } }', variables: { transcriptId: $json.meetingId } }) }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -65,7 +65,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\n// Convert Fireflies sentences array into a clean transcript text\nconst data = $json.data || {};\nconst transcript = data.transcript || {};\nconst sentences = transcript.sentences || [];\n\n// Build full transcript text: \"Speaker: text\"\nconst transcriptText = sentences\n  .map(s => `${s.speaker_name || 'Unknown'}: ${s.raw_words || ''}`)\n  .join('\\n');\n\nconst meetingTitle = transcript.title || 'Google Meet Call';\nconst summary = transcript.summary || {};\n\nreturn [{\n  json: {\n    text: transcriptText,\n    meetingTitle,\n    actionItems: summary.action_items || '',\n    overview: summary.overview || ''\n  }\n}];\n"
+        "jsCode": "\n// Convert Fireflies sentences array into a clean transcript text\nconst data = $json.data || {};\nconst transcript = data.transcript || {};\nconst sentences = transcript.sentences || [];\n\n// Build full transcript text: \"Speaker: text\"\n// Fireflies' Sentence type exposes the spoken text on `text` (with `raw_text`\n// as a sibling). We prefer `text` and fall back to `raw_text` just in case.\nconst transcriptText = sentences\n  .map(s => `${s.speaker_name || 'Unknown'}: ${s.text || s.raw_text || ''}`)\n  .join('\\n');\n\nconst meetingTitle = transcript.title || 'Google Meet Call';\nconst summary = transcript.summary || {};\n\nreturn [{\n  json: {\n    text: transcriptText,\n    meetingTitle,\n    actionItems: summary.action_items || '',\n    overview: summary.overview || ''\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
