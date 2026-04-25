@@ -1,0 +1,865 @@
+{
+  "name": "Google Meet Analyzer (Fireflies + GPT-4.1-mini + Airtable)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "fireflies-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -16
+      ],
+      "id": "5cf6bd06-1364-4411-a545-6439ce864efd",
+      "name": "Fireflies Webhook",
+      "webhookId": "fireflies-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n's Webhook node always wraps the incoming HTTP request as:\n//   { headers, params, query, body }\n// Fireflies posts a JSON body with one of two shapes:\n//   v1: { meetingId, eventType, clientReferenceId? }\n//   v2: { event, timestamp, meeting_id, client_reference_id? }\n// Some manual test tools (curl, Postman) may send the fields at the top level\n// of the n8n item, so we fall back to $json itself if .body is absent.\n\nconst raw = $input.first().json;\nconst body = (raw && typeof raw.body === 'object' && raw.body !== null) ? raw.body : raw;\n\n// Search every key Fireflies (or a manual test) might use, in order of preference.\nconst meetingId =\n  body.meetingId ||\n  body.meeting_id ||\n  body.transcriptId ||\n  body.transcript_id ||\n  body.id ||\n  body.data?.meetingId ||\n  body.data?.meeting_id ||\n  body.data?.transcriptId ||\n  body.data?.transcript_id ||\n  body.data?.id ||\n  body.payload?.meeting_id ||\n  body.payload?.meetingId ||\n  '';\n\nif (!meetingId) {\n  // Fail loudly so we never call Fireflies with an empty ID (which produces\n  // the misleading 'POST body missing, invalid Content-Type, or JSON object\n  // has no keys' error from the GraphQL endpoint).\n  throw new Error(\n    'Could not find a meeting/transcript ID in the Fireflies webhook payload. ' +\n    'Raw body received: ' + JSON.stringify(body)\n  );\n}\n\nconst eventType = body.event || body.eventType || '';\nconst title = body.title || body.data?.title || 'Untitled Meeting';\nconst date = body.date || body.data?.date || new Date().toISOString();\n\nreturn [{\n  json: {\n    meetingId,\n    eventType,\n    title,\n    date,\n    rawBody: body\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        -16
+      ],
+      "id": "c41d7bfb-0b71-4553-be69-fc940182e091",
+      "name": "Extract Meeting ID"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.fireflies.ai/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_FIREFLIES_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: 'query Transcript($transcriptId: String!) { transcript(id: $transcriptId) { id title sentences { speaker_name raw_words } summary { keywords action_items outline overview } } }', variables: { transcriptId: $json.meetingId } }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        784,
+        -16
+      ],
+      "id": "7a16fce9-c8aa-4320-bf31-4a326c243b87",
+      "name": "Fetch Transcript from Fireflies"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Convert Fireflies sentences array into a clean transcript text\nconst data = $json.data || {};\nconst transcript = data.transcript || {};\nconst sentences = transcript.sentences || [];\n\n// Build full transcript text: \"Speaker: text\"\nconst transcriptText = sentences\n  .map(s => `${s.speaker_name || 'Unknown'}: ${s.raw_words || ''}`)\n  .join('\\n');\n\nconst meetingTitle = transcript.title || 'Google Meet Call';\nconst summary = transcript.summary || {};\n\nreturn [{\n  json: {\n    text: transcriptText,\n    meetingTitle,\n    actionItems: summary.action_items || '',\n    overview: summary.overview || ''\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        -16
+      ],
+      "id": "4da3304b-837e-4961-8388-e09721ab2f0f",
+      "name": "Format Transcript"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Please analyze the call transcript"
+            },
+            {
+              "content": "=You are a call analytics agent for XYZ Company, a [business description and products\\services offered].\n\nYour task is to analyze call transcripts to provide comprehensive insights that will help our sales team better prepare for appointments, improve closing rates, and identify cross-selling opportunities.\n\nGiven the following call transcript, perform a detailed analysis:\n\nTranscript:\n\"\"\"\n{{ $json.text }}\n\"\"\"\n\nAnalyze the transcript for the following:\n\n1. **Sentiment Analysis**\n   - Overall sentiment (positive, neutral, negative)\n   - Enthusiasm level (high, medium, low)\n   - Frustration points and their intensity\n   - Confidence in decision to pursue our products and services\n   - Trust indicators toward our company\n\n2. **Pain Points Classification**\n   - List specific areas for pain points\n\n3. **Budget and Timeline Analysis**\n   - Budget mentioned or implied\n   - Decision timeline and urgency\n   - Seasonal considerations\n   - Financial constraints or considerations\n\n4. **Decision-Maker Insights**\n   - Caller's role in decision-making\n   - Other stakeholders involved\n   - Dynamics affecting decisions\n\n5. **Competitive Analysis**\n   - Competitors mentioned\n   - Other competitors or services considered\n   - Customer's perception of competitors\n\n6. **Cross-Sell Opportunities**\n   - Additional problems that could be addressed by our products and services\n   - Likelihood of interest in each additional service\n   - Specific cross-sell recommendations\n\n7. **Objection Prediction**\n   - Anticipated objections based on the call\n   - Recommended counter-strategies\n   - Concerns that need addressing\n\n8. **Agent Performance Evaluation**\n   - Overall score (1-10)\n   - Strengths demonstrated\n   - Areas for improvement\n   - Missed opportunities\n\n9. **Lead Qualification**\n    - Overall lead quality (poor, average, great)\n    - Readiness to purchase (1-10)\n    - Project scope potential (small, medium, large)\n    - Follow-up priority (1-10)\n\n10. **Appointment Preparation Recommendations**\n    - Priority topics to address\n    - Recommended materials or demonstrations\n    - Personalized talking points\n\n11. **Buyer Psychology**\n    - Primary and secondary motivations\n    - Decision-making style\n    - Recommended sales approach\n\nReturn your analysis in the following JSON format:\n\n{\n  \"caller_full_name\": \"\",\n  \"basic_analysis\": {\n    \"sentiment\": {\n      \"overall\": \"positive|neutral|negative\",\n      \"enthusiasm_level\": \"high|medium|low\",\n      \"frustration_points\": \"\",\n      \"frustration_intensity\": 0,\n      \"confidence_in_decision\": \"high|medium|low\",\n      \"trust_indicators\": \"\"\n    },\n    \"pain_points\": {\n      \"pain_points\": \"\",\n    },\n    \"agent_performance\": {\n      \"overall_score\": 0,\n      \"strengths\": \"\",\n      \"improvement_areas\": \"\",\n      \"missed_opportunities\": \"\"\n    },\n    \"lead_quality\": {\n      \"overall_rating\": \"poor|average|great\",\n      \"readiness_to_purchase\": 0,\n      \"project_scope\": \"small|medium|large\",\n      \"follow_up_priority\": 0\n    }\n  },\n  \"revenue_insights\": {\n    \"budget_analysis\": {\n      \"explicitly_mentioned\": \"\",\n      \"price_sensitivity\": \"high|medium|low\",\n      \"financing_interest\": \"yes|no\",\n      \"budget_readiness\": \"ready|needs_followup\"\n    },\n    \"decision_timeline\": {\n      \"urgency\": \"high|medium|low\",\n      \"target_completion\": \"\",\n      \"seasonal_factors\": \"\",\n      \"decision_blockers\": \"\"\n    },\n    \"property_details\": {\n      \"home_size\": \"\",\n      \"home_age\": \"\",\n      \"home_type\": \"\",\n      \"current_insulation\": \"\",\n      \"related_issues\": \"\"\n    },\n    \"competitive_landscape\": {\n      \"competitors_mentioned\": \"\",\n      \"other_quotes\": \"\",\n      \"competitor_perception\": \"\"\n    },\n    \"cross_sell_opportunities\": {\n      \"high_potential\": \"\",\n      \"medium_potential\": \"\",\n      \"low_potential\": \"\",\n      \"opportunity_reasoning\": \"\"\n    },\n    \"decision_makers\": {\n      \"caller_role\": \"\",\n      \"other_stakeholders\": \"\",\n      \"household_dynamics\": \"\"\n    },\n    \"objections\": \"\"\n  },\n  \"appointment_preparation\": {\n    \"priority_topics\": \"\",\n    \"recommended_materials\": \"\",\n    \"personalized_talking_points\": \"\"\n  },\n  \"buyer_psychology\": {\n    \"primary_motivation\": \"\",\n    \"secondary_motivation\": \"\",\n    \"decision_style\": \"\",\n    \"recommended_approach\": \"\"\n  },\n  \"conversation_summary\": \"\"\n}\n\n\nINSTRUCTIONS:\n• When mapping lists, join each item with a semicolon and a space (`\"; \"`).\n• If the list is empty, return an empty string `\"\"`.\n• Do not output JSON arrays—only strings for those fields.\n• Output **only** valid JSON matching the schema above—no extra text.\n\nEnsure your analysis is detailed, actionable, and focused on helping our sales team close more deals and increase average ticket size through appropriate cross-selling.",
+              "role": "system"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1264,
+        -16
+      ],
+      "id": "67b5d57e-1dc4-426d-9006-fb579d02aa93",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "pbkDySRGaKEob6ni",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appIGNj0EXxXkgLut",
+          "mode": "list",
+          "cachedResultName": "Untitled Base",
+          "cachedResultUrl": "https://airtable.com/appIGNj0EXxXkgLut"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblPbIAZC7P9w4zBE",
+          "mode": "list",
+          "cachedResultName": "Call Analysis",
+          "cachedResultUrl": "https://airtable.com/appIGNj0EXxXkgLut/tblPbIAZC7P9w4zBE"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Sentiment Frustration Intensity": "={{ $json.message.content.basic_analysis.sentiment.frustration_intensity }}",
+            "Agent Performance Overall Score": "={{ $json.message.content.basic_analysis.agent_performance.overall_score }}",
+            "Lead Quality Readiness to Purchase": "={{ $json.message.content.basic_analysis.lead_quality.readiness_to_purchase }}",
+            "Lead Quality Follow Up Priority": "={{ $json.message.content.basic_analysis.lead_quality.follow_up_priority }}",
+            "Caller Full Name": "={{ $json.message.content.caller_full_name }}",
+            "Conversation Summary": "={{ $json.message.content.conversation_summary }}",
+            "Sentiment Overall": "={{ $json.message.content.basic_analysis.sentiment.overall }}",
+            "Sentiment Enthusiasm Level": "={{ $json.message.content.basic_analysis.sentiment.enthusiasm_level }}",
+            "Sentiment Frustration Points": "={{ $json.message.content.basic_analysis.sentiment.frustration_points }}",
+            "Sentiment Confidence In Decision": "={{ $json.message.content.basic_analysis.sentiment.confidence_in_decision }}",
+            "Sentiment Trust Indicators": "={{ $json.message.content.basic_analysis.sentiment.trust_indicators }}",
+            "Pain Points": "={{ $json.message.content.basic_analysis.pain_points.pain_points }}",
+            "Agent Performance Strengths": "={{ $json.message.content.basic_analysis.agent_performance.strengths }}",
+            "Agent Performance Improvement Areas": "={{ $json.message.content.basic_analysis.agent_performance.improvement_areas }}",
+            "Agent Performance Missed Opportunities": "={{ $json.message.content.basic_analysis.agent_performance.missed_opportunities }}",
+            "Lead Quality Project Scope": "={{ $json.message.content.basic_analysis.lead_quality.project_scope }}",
+            "Budget Explicitly Mentioned": "={{ $json.message.content.revenue_insights.budget_analysis.explicitly_mentioned }}",
+            "Budget Price Sensitivity": "={{ $json.message.content.revenue_insights.budget_analysis.price_sensitivity }}",
+            "Budget Financing Interest": "={{ $json.message.content.revenue_insights.budget_analysis.financing_interest }}",
+            "Decision Timeline Urgency": "={{ $json.message.content.revenue_insights.decision_timeline.urgency }}",
+            "Budget Readiness": "={{ $json.message.content.revenue_insights.budget_analysis.budget_readiness }}",
+            "Decision Timeline Target Completion": "={{ $json.message.content.revenue_insights.decision_timeline.target_completion }}",
+            "Decision Timeline Seasonal Factors": "={{ $json.message.content.revenue_insights.decision_timeline.seasonal_factors }}",
+            "Decision Timeline Decision Blockers": "={{ $json.message.content.revenue_insights.decision_timeline.decision_blockers }}",
+            "Competitors Mentioned": "={{ $json.message.content.revenue_insights.competitive_landscape.competitors_mentioned }}",
+            "Other Quotes": "={{ $json.message.content.revenue_insights.competitive_landscape.other_quotes }}",
+            "Competitor Perception": "={{ $json.message.content.revenue_insights.competitive_landscape.competitor_perception }}",
+            "Cross Sell High Potential": "={{ $json.message.content.revenue_insights.cross_sell_opportunities.high_potential }}",
+            "Cross Sell Medium Potential": "={{ $json.message.content.revenue_insights.cross_sell_opportunities.medium_potential }}",
+            "Cross Sell Low Potential": "={{ $json.message.content.revenue_insights.cross_sell_opportunities.low_potential }}",
+            "Cross Sell Opportunity Reasoning": "={{ $json.message.content.revenue_insights.cross_sell_opportunities.opportunity_reasoning }}",
+            "Decision Maker Caller Role": "={{ $json.message.content.revenue_insights.decision_makers.caller_role }}",
+            "Decision Maker Other Stakeholders": "={{ $json.message.content.revenue_insights.decision_makers.other_stakeholders }}",
+            "Decision Maker Household Dynamics": "={{ $json.message.content.revenue_insights.decision_makers.household_dynamics }}",
+            "Objections": "={{ $json.message.content.revenue_insights.objections }}",
+            "Appointment Priority Topics": "={{ $json.message.content.appointment_preparation.priority_topics }}",
+            "Appointment Recommended Materials": "={{ $json.message.content.appointment_preparation.recommended_materials }}",
+            "Appointment Personalized Talking Points": "={{ $json.message.content.appointment_preparation.personalized_talking_points }}",
+            "Buyer Psychology Primary Motivation": "={{ $json.message.content.buyer_psychology.primary_motivation }}",
+            "Buyer Psychology Secondary Motivation": "={{ $json.message.content.buyer_psychology.secondary_motivation }}",
+            "Buyer Psychology Decision Style": "={{ $json.message.content.buyer_psychology.decision_style }}",
+            "Buyer Psychology Recommended Approach": "={{ $json.message.content.buyer_psychology.recommended_approach }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Caller Full Name",
+              "displayName": "Caller Full Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Conversation Summary",
+              "displayName": "Conversation Summary",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Sentiment Overall",
+              "displayName": "Sentiment Overall",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "positive",
+                  "value": "positive"
+                },
+                {
+                  "name": "neutral",
+                  "value": "neutral"
+                },
+                {
+                  "name": "negative",
+                  "value": "negative"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Sentiment Enthusiasm Level",
+              "displayName": "Sentiment Enthusiasm Level",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "high",
+                  "value": "high"
+                },
+                {
+                  "name": "medium",
+                  "value": "medium"
+                },
+                {
+                  "name": "low",
+                  "value": "low"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Sentiment Frustration Points",
+              "displayName": "Sentiment Frustration Points",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Sentiment Frustration Intensity",
+              "displayName": "Sentiment Frustration Intensity",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Sentiment Confidence In Decision",
+              "displayName": "Sentiment Confidence In Decision",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "high",
+                  "value": "high"
+                },
+                {
+                  "name": "medium",
+                  "value": "medium"
+                },
+                {
+                  "name": "low",
+                  "value": "low"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Sentiment Trust Indicators",
+              "displayName": "Sentiment Trust Indicators",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Pain Points",
+              "displayName": "Pain Points",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Agent Performance Overall Score",
+              "displayName": "Agent Performance Overall Score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Agent Performance Strengths",
+              "displayName": "Agent Performance Strengths",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Agent Performance Improvement Areas",
+              "displayName": "Agent Performance Improvement Areas",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Agent Performance Missed Opportunities",
+              "displayName": "Agent Performance Missed Opportunities",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Lead Quality Readiness to Purchase",
+              "displayName": "Lead Quality Readiness to Purchase",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Lead Quality Project Scope",
+              "displayName": "Lead Quality Project Scope",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "small",
+                  "value": "small"
+                },
+                {
+                  "name": "medium",
+                  "value": "medium"
+                },
+                {
+                  "name": "large",
+                  "value": "large"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Lead Quality Follow Up Priority",
+              "displayName": "Lead Quality Follow Up Priority",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Budget Explicitly Mentioned",
+              "displayName": "Budget Explicitly Mentioned",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Budget Price Sensitivity",
+              "displayName": "Budget Price Sensitivity",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "high",
+                  "value": "high"
+                },
+                {
+                  "name": "medium",
+                  "value": "medium"
+                },
+                {
+                  "name": "low",
+                  "value": "low"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Budget Financing Interest",
+              "displayName": "Budget Financing Interest",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "yes",
+                  "value": "yes"
+                },
+                {
+                  "name": "no",
+                  "value": "no"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Budget Readiness",
+              "displayName": "Budget Readiness",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "ready",
+                  "value": "ready"
+                },
+                {
+                  "name": "needs_followup",
+                  "value": "needs_followup"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Decision Timeline Urgency",
+              "displayName": "Decision Timeline Urgency",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "high",
+                  "value": "high"
+                },
+                {
+                  "name": "medium",
+                  "value": "medium"
+                },
+                {
+                  "name": "low",
+                  "value": "low"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Decision Timeline Target Completion",
+              "displayName": "Decision Timeline Target Completion",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Decision Timeline Seasonal Factors",
+              "displayName": "Decision Timeline Seasonal Factors",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Decision Timeline Decision Blockers",
+              "displayName": "Decision Timeline Decision Blockers",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Competitors Mentioned",
+              "displayName": "Competitors Mentioned",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Other Quotes",
+              "displayName": "Other Quotes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Competitor Perception",
+              "displayName": "Competitor Perception",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Cross Sell High Potential",
+              "displayName": "Cross Sell High Potential",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Cross Sell Medium Potential",
+              "displayName": "Cross Sell Medium Potential",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Cross Sell Low Potential",
+              "displayName": "Cross Sell Low Potential",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Cross Sell Opportunity Reasoning",
+              "displayName": "Cross Sell Opportunity Reasoning",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Decision Maker Caller Role",
+              "displayName": "Decision Maker Caller Role",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Decision Maker Other Stakeholders",
+              "displayName": "Decision Maker Other Stakeholders",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Decision Maker Household Dynamics",
+              "displayName": "Decision Maker Household Dynamics",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Objections",
+              "displayName": "Objections",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Appointment Priority Topics",
+              "displayName": "Appointment Priority Topics",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Appointment Recommended Materials",
+              "displayName": "Appointment Recommended Materials",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Appointment Personalized Talking Points",
+              "displayName": "Appointment Personalized Talking Points",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Buyer Psychology Primary Motivation",
+              "displayName": "Buyer Psychology Primary Motivation",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Buyer Psychology Secondary Motivation",
+              "displayName": "Buyer Psychology Secondary Motivation",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Buyer Psychology Decision Style",
+              "displayName": "Buyer Psychology Decision Style",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Buyer Psychology Recommended Approach",
+              "displayName": "Buyer Psychology Recommended Approach",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1600,
+        -16
+      ],
+      "id": "70e21525-3456-481a-95bf-ef48d7d50006",
+      "name": "Create a record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "ioj8ZMgBmYNop9Su",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"ok\" }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1808,
+        -16
+      ],
+      "id": "b33d6ea4-3988-4172-8354-49fcacbc3cda",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Fireflies Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Meeting ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Meeting ID": {
+      "main": [
+        [
+          {
+            "node": "Fetch Transcript from Fireflies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Transcript from Fireflies": {
+      "main": [
+        [
+          {
+            "node": "Format Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Transcript": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Create a record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a record": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b147c79d-009c-42fb-a2dd-4cb6b4ed66e7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "20b4ce8309b7b5719989a111ea416965cb3f147e76845c3accd0b87567010734"
+  },
+  "id": "oGPVmtCnCq7NQ19Y",
+  "tags": []
+}
