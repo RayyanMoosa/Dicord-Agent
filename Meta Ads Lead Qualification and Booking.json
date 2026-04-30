@@ -1,0 +1,835 @@
+{
+  "name": "Meta Ads Lead Qualification & Booking",
+  "nodes": [
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "agencyOwnerEmail", "value": "owner@your-agency.com" },
+            { "name": "clientEmail", "value": "client@example.com" },
+            { "name": "clientName", "value": "Example Client" },
+            { "name": "googleSheetId", "value": "REPLACE_WITH_YOUR_GOOGLE_SHEET_ID" },
+            { "name": "googleSheetTab", "value": "Leads" },
+            { "name": "calendlyLink", "value": "https://calendly.com/your-agency/discovery" },
+            { "name": "whatsappPhoneNumberId", "value": "REPLACE_WITH_WA_PHONE_NUMBER_ID" },
+            { "name": "whatsappAccessToken", "value": "REPLACE_WITH_WA_PERMANENT_TOKEN" },
+            { "name": "qualificationQuestion1", "value": "What service are you looking for?" },
+            { "name": "qualificationQuestion2", "value": "What is the current condition of your roof?" },
+            { "name": "finalQualifyingMessage", "value": "Sounds like we can help. Let's schedule a quick 10-minute call to go over details and next steps. Do mornings or afternoons work better for you?" },
+            { "name": "leadSource", "value": "Meta Ads" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "Config (edit per client)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [200, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "meta-lead",
+        "options": {}
+      },
+      "id": "22222222-2222-2222-2222-222222222222",
+      "name": "Meta Lead Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 500],
+      "webhookId": "meta-lead-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.email || $json.body.phone || '' }}",
+              "operation": "isNotEmpty"
+            },
+            {
+              "value1": "={{ $json.body.name || $json.body.full_name || '' }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        },
+        "combineOperation": "all"
+      },
+      "id": "33333333-3333-3333-3333-333333333333",
+      "name": "Validate Lead Data",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [420, 500]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config (edit per client)').item.json.agencyOwnerEmail }}",
+        "toEmail": "={{ $('Config (edit per client)').item.json.agencyOwnerEmail }}",
+        "subject": "Meta Ads Lead - Missing Data",
+        "text": "=A Meta Ads lead arrived with missing required fields.\n\nRaw payload:\n{{ JSON.stringify($('Meta Lead Webhook').item.json.body, null, 2) }}",
+        "options": {}
+      },
+      "id": "44444444-4444-4444-4444-444444444444",
+      "name": "Notify Owner: Missing Data",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [640, 700],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "leadId", "value": "={{ $json.body.lead_id || $json.body.id || $now.toMillis() }}" },
+            { "name": "name", "value": "={{ $json.body.name || $json.body.full_name }}" },
+            { "name": "firstName", "value": "={{ ($json.body.name || $json.body.full_name || '').split(' ')[0] }}" },
+            { "name": "email", "value": "={{ $json.body.email || '' }}" },
+            { "name": "phone", "value": "={{ ($json.body.phone || $json.body.phone_number || '').toString().replace(/[^0-9+]/g,'') }}" },
+            { "name": "service", "value": "={{ $json.body.service || $json.body.service_interest || '' }}" },
+            { "name": "timestamp", "value": "={{ $now.toISO() }}" },
+            { "name": "source", "value": "={{ $('Config (edit per client)').item.json.leadSource }}" },
+            { "name": "status", "value": "New" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "55555555-5555-5555-5555-555555555555",
+      "name": "Normalize Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [640, 400]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "={{ $('Config (edit per client)').item.json.googleSheetId }}",
+        "sheetName": "={{ $('Config (edit per client)').item.json.googleSheetTab }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "leadId": "={{ $json.leadId }}",
+            "name": "={{ $json.name }}",
+            "email": "={{ $json.email }}",
+            "phone": "={{ $json.phone }}",
+            "service": "={{ $json.service }}",
+            "timestamp": "={{ $json.timestamp }}",
+            "source": "={{ $json.source }}",
+            "status": "={{ $json.status }}",
+            "answer1": "",
+            "answer2": "",
+            "bookingStatus": "Pending"
+          }
+        },
+        "options": {}
+      },
+      "id": "66666666-6666-6666-6666-666666666666",
+      "name": "Append Lead to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [860, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config (edit per client)').item.json.agencyOwnerEmail }}",
+        "toEmail": "={{ $('Config (edit per client)').item.json.agencyOwnerEmail }}",
+        "subject": "=New Meta Ads Lead: {{ $json.name }}",
+        "text": "=A new lead just came in from Meta Ads.\n\nName: {{ $json.name }}\nEmail: {{ $json.email }}\nPhone: {{ $json.phone }}\nService: {{ $json.service }}\nTimestamp: {{ $json.timestamp }}\nSource: {{ $json.source }}",
+        "options": {}
+      },
+      "id": "77777777-7777-7777-7777-777777777777",
+      "name": "Notify Agency Owner",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1080, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config (edit per client)').item.json.agencyOwnerEmail }}",
+        "toEmail": "={{ $('Config (edit per client)').item.json.clientEmail }}",
+        "subject": "=New lead for {{ $('Config (edit per client)').item.json.clientName }}: {{ $json.name }}",
+        "text": "=Hi,\n\nA new Meta Ads lead has been captured for your campaign.\n\nName: {{ $json.name }}\nEmail: {{ $json.email }}\nPhone: {{ $json.phone }}\nService: {{ $json.service }}\nTimestamp: {{ $json.timestamp }}\nSource: {{ $json.source }}\n\nWe will begin the automated follow-up shortly.",
+        "options": {}
+      },
+      "id": "88888888-8888-8888-8888-888888888888",
+      "name": "Notify Client",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1080, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "minutes"
+      },
+      "id": "99999999-9999-9999-9999-999999999999",
+      "name": "Wait 2 Minutes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1300, 400],
+      "webhookId": "wait-2-min"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $('Config (edit per client)').item.json.whatsappPhoneNumberId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Config (edit per client)').item.json.whatsappAccessToken }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Normalize Lead').item.json.phone }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"Hey {{ $('Normalize Lead').item.json.firstName }}, thanks for your inquiry. Can I ask you a few quick questions to see how we can help?\" }\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "name": "Send WhatsApp: Initial Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1520, 400],
+      "continueOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config (edit per client)').item.json.agencyOwnerEmail }}",
+        "toEmail": "={{ $('Normalize Lead').item.json.email }}",
+        "subject": "=Quick question about your inquiry",
+        "text": "=Hey {{ $('Normalize Lead').item.json.firstName }},\n\nThanks for your inquiry. Can I ask you a few quick questions to see how we can help?\n\nReply to this email and we'll take it from there.",
+        "options": {}
+      },
+      "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "name": "Email Fallback: Initial Message",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1740, 600],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": "={{ $('Config (edit per client)').item.json.googleSheetId }}",
+        "sheetName": "={{ $('Config (edit per client)').item.json.googleSheetTab }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": ["leadId"],
+          "value": {
+            "leadId": "={{ $('Normalize Lead').item.json.leadId }}",
+            "status": "Contacted"
+          }
+        },
+        "options": {}
+      },
+      "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      "name": "Update Status: Contacted",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1960, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "=reply-{{ $('Normalize Lead').item.json.leadId }}-1",
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 30,
+              "resumeUnit": "minutes"
+            }
+          }
+        }
+      },
+      "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      "name": "Wait For Reply (30m)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [2180, 400],
+      "webhookId": "wait-reply-1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ ($json.body && ($json.body.message || $json.body.text || $json.body.reply) || '').toString().toLowerCase() }}",
+              "operation": "regex",
+              "value2": "(yes|sure|ok|okay|yeah|yep|interested|sounds good|please|y)"
+            }
+          ]
+        }
+      },
+      "id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+      "name": "Replied Positively? (1)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [2400, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $('Config (edit per client)').item.json.whatsappPhoneNumberId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Config (edit per client)').item.json.whatsappAccessToken }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Normalize Lead').item.json.phone }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"Just checking back in {{ $('Normalize Lead').item.json.firstName }} - did you still want help with your inquiry? Happy to answer any questions.\" }\n}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+      "name": "Follow-Up #1 (after 30m)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2620, 600],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "=reply-{{ $('Normalize Lead').item.json.leadId }}-2",
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 1,
+              "resumeUnit": "hours"
+            }
+          }
+        }
+      },
+      "id": "10101010-1010-1010-1010-101010101010",
+      "name": "Wait For Reply (1h)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [2840, 600],
+      "webhookId": "wait-reply-2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ ($json.body && ($json.body.message || $json.body.text || $json.body.reply) || '').toString().toLowerCase() }}",
+              "operation": "regex",
+              "value2": "(yes|sure|ok|okay|yeah|yep|interested|sounds good|please|y)"
+            }
+          ]
+        }
+      },
+      "id": "20202020-2020-2020-2020-202020202020",
+      "name": "Replied Positively? (2)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [3060, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $('Config (edit per client)').item.json.whatsappPhoneNumberId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Config (edit per client)').item.json.whatsappAccessToken }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Normalize Lead').item.json.phone }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"Hey {{ $('Normalize Lead').item.json.firstName }}, no rush - just wanted to make sure you got my last message. Whenever you're ready, reply 'YES' and I'll walk you through the next steps.\" }\n}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "30303030-3030-3030-3030-303030303030",
+      "name": "Follow-Up #2 (after 1h)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3280, 800],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "=reply-{{ $('Normalize Lead').item.json.leadId }}-3",
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 24,
+              "resumeUnit": "hours"
+            }
+          }
+        }
+      },
+      "id": "40404040-4040-4040-4040-404040404040",
+      "name": "Wait For Reply (24h)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [3500, 800],
+      "webhookId": "wait-reply-3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ ($json.body && ($json.body.message || $json.body.text || $json.body.reply) || '').toString().toLowerCase() }}",
+              "operation": "regex",
+              "value2": "(yes|sure|ok|okay|yeah|yep|interested|sounds good|please|y)"
+            }
+          ]
+        }
+      },
+      "id": "50505050-5050-5050-5050-505050505050",
+      "name": "Replied Positively? (3)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [3720, 800]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $('Config (edit per client)').item.json.whatsappPhoneNumberId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Config (edit per client)').item.json.whatsappAccessToken }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Normalize Lead').item.json.phone }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"Hey {{ $('Normalize Lead').item.json.firstName }}, this is my last note. If you're still interested just reply 'YES' and I'll send you the booking link. Otherwise no worries - have a great day!\" }\n}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "60606060-6060-6060-6060-606060606060",
+      "name": "Final Follow-Up (after 24h)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3940, 1000],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": "={{ $('Config (edit per client)').item.json.googleSheetId }}",
+        "sheetName": "={{ $('Config (edit per client)').item.json.googleSheetTab }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": ["leadId"],
+          "value": {
+            "leadId": "={{ $('Normalize Lead').item.json.leadId }}",
+            "status": "No Response"
+          }
+        },
+        "options": {}
+      },
+      "id": "70707070-7070-7070-7070-707070707070",
+      "name": "Mark No Response",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [4160, 1000],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {},
+      "id": "80808080-8080-8080-8080-808080808080",
+      "name": "Start Qualification",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [3500, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $('Config (edit per client)').item.json.whatsappPhoneNumberId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Config (edit per client)').item.json.whatsappAccessToken }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Normalize Lead').item.json.phone }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"Awesome! Quick question 1 of 2: {{ $('Config (edit per client)').item.json.qualificationQuestion1 }}\" }\n}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "90909090-9090-9090-9090-909090909090",
+      "name": "Chatbot Q1: Service",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3720, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "=qual-{{ $('Normalize Lead').item.json.leadId }}-q1",
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 24,
+              "resumeUnit": "hours"
+            }
+          }
+        }
+      },
+      "id": "a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1",
+      "name": "Wait Answer Q1",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [3940, 200],
+      "webhookId": "wait-qual-q1"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "answer1",
+              "value": "={{ ($json.body && ($json.body.message || $json.body.text || $json.body.reply)) || '' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1",
+      "name": "Store Answer 1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [4160, 200]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": "={{ $('Config (edit per client)').item.json.googleSheetId }}",
+        "sheetName": "={{ $('Config (edit per client)').item.json.googleSheetTab }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": ["leadId"],
+          "value": {
+            "leadId": "={{ $('Normalize Lead').item.json.leadId }}",
+            "answer1": "={{ $json.answer1 }}",
+            "status": "Qualifying"
+          }
+        },
+        "options": {}
+      },
+      "id": "c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1",
+      "name": "Save Answer 1 to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [4380, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $('Config (edit per client)').item.json.whatsappPhoneNumberId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Config (edit per client)').item.json.whatsappAccessToken }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Normalize Lead').item.json.phone }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"Got it. Question 2 of 2: {{ $('Config (edit per client)').item.json.qualificationQuestion2 }}\" }\n}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1",
+      "name": "Chatbot Q2: Niche",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4600, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "=qual-{{ $('Normalize Lead').item.json.leadId }}-q2",
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 24,
+              "resumeUnit": "hours"
+            }
+          }
+        }
+      },
+      "id": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+      "name": "Wait Answer Q2",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [4820, 200],
+      "webhookId": "wait-qual-q2"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "answer2",
+              "value": "={{ ($json.body && ($json.body.message || $json.body.text || $json.body.reply)) || '' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f1f1f1f1-f1f1-f1f1-f1f1-f1f1f1f1f1f1",
+      "name": "Store Answer 2",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [5040, 200]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": "={{ $('Config (edit per client)').item.json.googleSheetId }}",
+        "sheetName": "={{ $('Config (edit per client)').item.json.googleSheetTab }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": ["leadId"],
+          "value": {
+            "leadId": "={{ $('Normalize Lead').item.json.leadId }}",
+            "answer2": "={{ $json.answer2 }}",
+            "status": "Qualified"
+          }
+        },
+        "options": {}
+      },
+      "id": "12121212-1212-1212-1212-121212121212",
+      "name": "Save Answer 2 + Mark Qualified",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [5260, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $('Config (edit per client)').item.json.whatsappPhoneNumberId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Config (edit per client)').item.json.whatsappAccessToken }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Normalize Lead').item.json.phone }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"{{ $('Config (edit per client)').item.json.finalQualifyingMessage }}\\n\\nFeel free to book a time using the link below:\\n{{ $('Config (edit per client)').item.json.calendlyLink }}\" }\n}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "13131313-1313-1313-1313-131313131313",
+      "name": "Send Calendly Booking Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [5480, 200],
+      "continueOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config (edit per client)').item.json.agencyOwnerEmail }}",
+        "toEmail": "={{ $('Normalize Lead').item.json.email }}",
+        "subject": "=Book a quick call with {{ $('Config (edit per client)').item.json.clientName }}",
+        "text": "=Hey {{ $('Normalize Lead').item.json.firstName }},\n\n{{ $('Config (edit per client)').item.json.finalQualifyingMessage }}\n\nFeel free to book a time using this link: {{ $('Config (edit per client)').item.json.calendlyLink }}",
+        "options": {}
+      },
+      "id": "14141414-1414-1414-1414-141414141414",
+      "name": "Email Fallback: Booking Link",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [5700, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": "={{ $('Config (edit per client)').item.json.googleSheetId }}",
+        "sheetName": "={{ $('Config (edit per client)').item.json.googleSheetTab }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": ["leadId"],
+          "value": {
+            "leadId": "={{ $('Normalize Lead').item.json.leadId }}",
+            "bookingStatus": "Link Sent",
+            "status": "Booking Sent"
+          }
+        },
+        "options": {}
+      },
+      "id": "15151515-1515-1515-1515-151515151515",
+      "name": "Update Status: Booking Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [5920, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {},
+      "id": "16161616-1616-1616-1616-161616161616",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [200, 1100]
+    },
+    {
+      "parameters": {
+        "fromEmail": "owner@your-agency.com",
+        "toEmail": "owner@your-agency.com",
+        "subject": "=[n8n] Lead Workflow Error: {{ $json.execution.error.message }}",
+        "text": "=A lead workflow execution failed.\n\nWorkflow: {{ $json.workflow.name }}\nNode: {{ $json.execution.lastNodeExecuted }}\nError: {{ $json.execution.error.message }}\nExecution URL: {{ $json.execution.url }}\n\nFull error:\n{{ JSON.stringify($json, null, 2) }}",
+        "options": {}
+      },
+      "id": "17171717-1717-1717-1717-171717171717",
+      "name": "Email Owner: Workflow Error",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [420, 1100],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Meta Lead Webhook": {
+      "main": [[{ "node": "Config (edit per client)", "type": "main", "index": 0 }]]
+    },
+    "Config (edit per client)": {
+      "main": [[{ "node": "Validate Lead Data", "type": "main", "index": 0 }]]
+    },
+    "Validate Lead Data": {
+      "main": [
+        [{ "node": "Normalize Lead", "type": "main", "index": 0 }],
+        [{ "node": "Notify Owner: Missing Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize Lead": {
+      "main": [[{ "node": "Append Lead to Google Sheet", "type": "main", "index": 0 }]]
+    },
+    "Append Lead to Google Sheet": {
+      "main": [
+        [
+          { "node": "Notify Agency Owner", "type": "main", "index": 0 },
+          { "node": "Notify Client", "type": "main", "index": 0 },
+          { "node": "Wait 2 Minutes", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wait 2 Minutes": {
+      "main": [[{ "node": "Send WhatsApp: Initial Message", "type": "main", "index": 0 }]]
+    },
+    "Send WhatsApp: Initial Message": {
+      "main": [
+        [{ "node": "Update Status: Contacted", "type": "main", "index": 0 }],
+        [{ "node": "Email Fallback: Initial Message", "type": "main", "index": 0 }]
+      ]
+    },
+    "Email Fallback: Initial Message": {
+      "main": [[{ "node": "Update Status: Contacted", "type": "main", "index": 0 }]]
+    },
+    "Update Status: Contacted": {
+      "main": [[{ "node": "Wait For Reply (30m)", "type": "main", "index": 0 }]]
+    },
+    "Wait For Reply (30m)": {
+      "main": [[{ "node": "Replied Positively? (1)", "type": "main", "index": 0 }]]
+    },
+    "Replied Positively? (1)": {
+      "main": [
+        [{ "node": "Start Qualification", "type": "main", "index": 0 }],
+        [{ "node": "Follow-Up #1 (after 30m)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Follow-Up #1 (after 30m)": {
+      "main": [[{ "node": "Wait For Reply (1h)", "type": "main", "index": 0 }]]
+    },
+    "Wait For Reply (1h)": {
+      "main": [[{ "node": "Replied Positively? (2)", "type": "main", "index": 0 }]]
+    },
+    "Replied Positively? (2)": {
+      "main": [
+        [{ "node": "Start Qualification", "type": "main", "index": 0 }],
+        [{ "node": "Follow-Up #2 (after 1h)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Follow-Up #2 (after 1h)": {
+      "main": [[{ "node": "Wait For Reply (24h)", "type": "main", "index": 0 }]]
+    },
+    "Wait For Reply (24h)": {
+      "main": [[{ "node": "Replied Positively? (3)", "type": "main", "index": 0 }]]
+    },
+    "Replied Positively? (3)": {
+      "main": [
+        [{ "node": "Start Qualification", "type": "main", "index": 0 }],
+        [{ "node": "Final Follow-Up (after 24h)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Final Follow-Up (after 24h)": {
+      "main": [[{ "node": "Mark No Response", "type": "main", "index": 0 }]]
+    },
+    "Start Qualification": {
+      "main": [[{ "node": "Chatbot Q1: Service", "type": "main", "index": 0 }]]
+    },
+    "Chatbot Q1: Service": {
+      "main": [[{ "node": "Wait Answer Q1", "type": "main", "index": 0 }]]
+    },
+    "Wait Answer Q1": {
+      "main": [[{ "node": "Store Answer 1", "type": "main", "index": 0 }]]
+    },
+    "Store Answer 1": {
+      "main": [[{ "node": "Save Answer 1 to Sheet", "type": "main", "index": 0 }]]
+    },
+    "Save Answer 1 to Sheet": {
+      "main": [[{ "node": "Chatbot Q2: Niche", "type": "main", "index": 0 }]]
+    },
+    "Chatbot Q2: Niche": {
+      "main": [[{ "node": "Wait Answer Q2", "type": "main", "index": 0 }]]
+    },
+    "Wait Answer Q2": {
+      "main": [[{ "node": "Store Answer 2", "type": "main", "index": 0 }]]
+    },
+    "Store Answer 2": {
+      "main": [[{ "node": "Save Answer 2 + Mark Qualified", "type": "main", "index": 0 }]]
+    },
+    "Save Answer 2 + Mark Qualified": {
+      "main": [[{ "node": "Send Calendly Booking Link", "type": "main", "index": 0 }]]
+    },
+    "Send Calendly Booking Link": {
+      "main": [
+        [{ "node": "Update Status: Booking Sent", "type": "main", "index": 0 }],
+        [{ "node": "Email Fallback: Booking Link", "type": "main", "index": 0 }]
+      ]
+    },
+    "Email Fallback: Booking Link": {
+      "main": [[{ "node": "Update Status: Booking Sent", "type": "main", "index": 0 }]]
+    },
+    "Error Trigger": {
+      "main": [[{ "node": "Email Owner: Workflow Error", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": [
+    { "name": "meta-ads" },
+    { "name": "lead-qualification" },
+    { "name": "calendly" }
+  ],
+  "active": false
+}
